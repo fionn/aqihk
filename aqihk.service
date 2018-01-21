@@ -1,0 +1,11 @@
+# /etc/systemd/system/aqihk.service
+[Unit]
+Description=Hong Kong air quality Twitter bot
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 -u /path/to/bots/aqihk/aqihk.py
+StandardOutput=syslog
+StandardError=syslog
+
