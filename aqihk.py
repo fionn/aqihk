@@ -58,15 +58,16 @@ def compose(aq):
     return composition
 
 def criteria(status):
-    different_status = status != API.user_timeline(count = 1).pop().text
-    under_240 = len(status) <= 240
-    return different_status and under_240
+    return status != API.user_timeline(count = 1).pop().text
 
 def update(aq):
     status = compose(aq)
     if criteria(status):
-        API.update_status(status = status, place_id = "35fd5bacecc4c6e5")
-        print("[{}]: {}".format(aq.localtime, status))
+        try:
+            print("[{}]: {}".format(aq.localtime, status))
+            API.update_status(status = status, place_id = "35fd5bacecc4c6e5")
+        except tweepy.error.TweepError as e:
+            print(e)
 
 def main():
     previous_aq = None

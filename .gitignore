@@ -1,5 +1,6 @@
 aqicn.py
 credentials.py
+__pycache__
 *.swp
 *.bfh
 
