@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import time
+import json
 import requests
 import tweepy
 import aqicn
@@ -24,10 +25,18 @@ class AirQuality:
     @staticmethod
     def _aqi_data():
         payload = {"token": aqicn.token}
-        r = requests.get("https://api.waqi.info/feed/@3308/", params = payload)
-        r = r.json()
-        assert r["status"] == "ok"
-        return r["data"]
+        while True:
+            try:
+                r = requests.get("https://api.waqi.info/feed/@3308/", params=payload)
+                r.raise_for_status()
+                try:
+                    response = r.json()
+                except json.JSONDecodeError as e:
+                    print("Bad API data: {}".format(r.text), flush=True)
+                    raise e
+                return response["data"]
+            except requests.exceptions.ConnectionError as e:
+                exception_handler(e)
 
     def _category(self):
         if self.aqi <= 50:
@@ -41,7 +50,7 @@ class AirQuality:
         elif self.aqi <= 300:
             return "very unhealthy"
         elif self.aqi <= 500:
-            return "hazardus"
+            return "hazardous"
         return "off the scale"
 
 def compose(aq):
@@ -58,30 +67,46 @@ def compose(aq):
     return composition
 
 def criteria(status):
-    return status != API.user_timeline(count = 1).pop().text
+    try:
+        return status != API.user_timeline(count=1).pop().text
+    except tweepy.error.TweepError as e:
+        exception_handler(e)
+        return False
 
 def update(aq):
     status = compose(aq)
     if criteria(status):
         try:
             print("[{}]: {}".format(aq.localtime, status))
-            API.update_status(status = status, place_id = "35fd5bacecc4c6e5")
+            API.update_status(status=status, place_id="35fd5bacecc4c6e5")
         except tweepy.error.TweepError as e:
-            print(e)
+            exception_handler(e)
+    else:
+        print("Status \"{}\" is a duplicate".format(status))
+
+def exception_handler(e):
+    print(e)
+    t = 15 * 60
+    print("Sleeping for {} seconds".format(t))
+    time.sleep(t)
+    print("Waking up")
 
 def main():
     previous_aq = None
 
     while True:
-        aq = AirQuality()
-        if previous_aq is None:
-            update(aq)
-            previous_aq = aq
-        elif aq.time > previous_aq.time:
-            update(aq)
-            previous_aq = aq
-        else:
-            time.sleep(240)
+        try:
+            aq = AirQuality()
+            if previous_aq is None:
+                update(aq)
+                previous_aq = aq
+            elif aq.time > previous_aq.time:
+                update(aq)
+                previous_aq = aq
+            else:
+                time.sleep(240)
+        except json.JSONDecodeError as e:
+            exception_handler(e)
 
 if __name__ == "__main__":
     main()
