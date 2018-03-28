@@ -8,4 +8,6 @@ Type=simple
 ExecStart=/usr/bin/env python3 -u /path/to/bots/aqihk/aqihk.py
 StandardOutput=syslog
 StandardError=syslog
+Restart=on-failure
+RestartSec=90
 
