@@ -1,11 +1,12 @@
-# /etc/systemd/system/aqihk.service
+# symlink to /etc/systemd/system/aqihk.service
 [Unit]
 Description=Hong Kong air quality Twitter bot
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/env python3 -u /path/to/bots/aqihk/aqihk.py
+WorkingDirectory=/home/fionn/bots/aqihk/
+ExecStart=/home/fionn/bots/aqihk/environment/bin/python3 -u aqihk.py
 StandardOutput=syslog
 StandardError=syslog
 Restart=on-failure

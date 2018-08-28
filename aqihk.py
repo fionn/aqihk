@@ -13,67 +13,82 @@ API = tweepy.API(AUTH, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 
 class AirQuality:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._aqi_dict = self._aqi_data()
         self.aqi = int(self._aqi_dict["aqi"])
-        self.dominant_pollutant = self._aqi_dict["dominentpol"]
         self.category = self._category()
         self.time = self._aqi_dict["time"]["v"]
         self.localtime = self._aqi_dict["time"]["s"] \
                          + self._aqi_dict["time"]["tz"]
 
+    def dominant_pollutant(self) -> str:
+        pollutant_map = {"pm25": "PM2.5",
+                         "pm10": "PM10",
+                         "co": "CO",
+                         "no2": "NO2",
+                         "o3": "O3",
+                         "so2": "SO2"}
+
+        density = 0
+        dominant_pollutant = None
+        iaqi = self._aqi_dict["iaqi"]
+        for pollutant in pollutant_map:
+            aqi = iaqi[pollutant]["v"]
+            if aqi > density:
+                density = aqi
+                dominant_pollutant = pollutant
+
+        if not dominant_pollutant:
+            raise RuntimeError("No dominant pollutant")
+
+        return pollutant_map[dominant_pollutant]
+
     @staticmethod
-    def _aqi_data():
+    def _aqi_data() -> dict:
+        endpoint = "https://api.waqi.info/feed/@3308/"
         payload = {"token": aqicn.token}
         while True:
             try:
-                r = requests.get("https://api.waqi.info/feed/@3308/", params=payload)
+                r = requests.get(endpoint, params=payload)
                 r.raise_for_status()
-                try:
-                    response = r.json()
-                except json.JSONDecodeError as e:
-                    print("Bad API data: {}".format(r.text), flush=True)
-                    raise e
+                response = r.json()
+                if response["status"] != "ok":
+                    raise requests.HTTPError(response["status"])
                 return response["data"]
             except requests.exceptions.ConnectionError as e:
                 exception_handler(e)
+            except json.JSONDecodeError:
+                print("Bad API data: {}".format(r.text), flush=True)
+                raise
 
-    def _category(self):
+    def _category(self) -> str:
         if self.aqi <= 50:
             return "good"
-        elif self.aqi <= 100:
+        if self.aqi <= 100:
             return "moderate"
-        elif self.aqi <= 150:
+        if self.aqi <= 150:
             return "unhealthy for sensitive groups"
-        elif self.aqi <= 200:
+        if self.aqi <= 200:
             return "unhealthy"
-        elif self.aqi <= 300:
+        if self.aqi <= 300:
             return "very unhealthy"
-        elif self.aqi <= 500:
+        if self.aqi <= 500:
             return "hazardous"
         return "off the scale"
 
-def compose(aq):
-    pollutant_map = {"pm25": "PM2.5",
-                     "pm10": "PM10",
-                     "co": "CO",
-                     "no2": "NO2",
-                     "o3": "O3",
-                     "so2": "SO2"}
-    dominant_pollutant = pollutant_map.get(aq.dominant_pollutant)
-
+def compose(aq: AirQuality) -> str:
     composition = "AQI: {}. The dominant pollutant is {}. (This is {}.)" \
-                  .format(aq.aqi, dominant_pollutant, aq.category)
+                  .format(aq.aqi, aq.dominant_pollutant(), aq.category)
     return composition
 
-def criteria(status):
+def criteria(status: str) -> bool:
     try:
         return status != API.user_timeline(count=1).pop().text
     except tweepy.error.TweepError as e:
         exception_handler(e)
         return False
 
-def update(aq):
+def update(aq: AirQuality) -> None:
     status = compose(aq)
     if criteria(status):
         try:
@@ -84,15 +99,16 @@ def update(aq):
     else:
         print("Status \"{}\" is a duplicate".format(status))
 
-def exception_handler(e):
+def exception_handler(e: Exception) -> None:
     print(e)
     t = 15 * 60
     print("Sleeping for {} seconds".format(t))
     time.sleep(t)
     print("Waking up")
 
-def main():
+def main() -> None:
     previous_aq = None
+    sleep_time = 240
 
     while True:
         try:
@@ -100,11 +116,14 @@ def main():
             if previous_aq is None:
                 update(aq)
                 previous_aq = aq
+                time.sleep(sleep_time)
             elif aq.time > previous_aq.time:
                 update(aq)
                 previous_aq = aq
+                time.sleep(sleep_time)
             else:
-                time.sleep(240)
+                print("Just sleeping")
+                time.sleep(sleep_time)
         except json.JSONDecodeError as e:
             exception_handler(e)
 
