@@ -1,8 +1,7 @@
-aqicn.py
-credentials.py
-__pycache__
-.mypy_cache
-environment
+.env
+venv/
+__pycache__/
+.mypy_cache/
 *.swp
 *.bfh
 assets

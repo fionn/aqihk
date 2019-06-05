@@ -1,3 +1,5 @@
-environment: requirements.txt
-	@python -m venv environment
-	@source environment/bin/activate && pip install -r requirements.txt
+VENV ?= venv
+
+$(VENV): requirements.txt
+	@python -m venv $@ --prompt $@::aq
+	@source $@/bin/activate && pip install -r $<
