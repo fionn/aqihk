@@ -2,15 +2,9 @@
 """Tweet the air quality in Hong Kong"""
 
 import os
-import time
 import json
 import requests
 import tweepy
-
-AUTH = tweepy.OAuthHandler(os.environ["API_KEY"], os.environ["API_SECRET"])
-AUTH.set_access_token(os.environ["ACCESS_TOKEN"],
-                      os.environ["ACCESS_TOKEN_SECRET"])
-API = tweepy.API(AUTH, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 
 # pylint: disable=too-few-public-methods
 class AirQuality:
@@ -59,8 +53,6 @@ class AirQuality:
                 if response_dict["status"] != "ok":
                     raise requests.HTTPError(response_dict["status"])
                 return response_dict["data"]
-            except requests.exceptions.ConnectionError as exception:
-                exception_handler(exception)
             except json.JSONDecodeError:
                 print("Bad API data: {}".format(response.text), flush=True)
                 raise
@@ -81,67 +73,51 @@ class AirQuality:
             return "hazardous"
         return "off the scale"
 
-# pylint: disable=invalid-name
-def compose(aq: AirQuality) -> str:
-    """Write the tweet"""
-    return "AQI: {}. The dominant pollutant is {}. (This is {}.)" \
-           .format(aq.aqi, aq.dominant_pollutant(), aq.category)
+class Twitter:
+    """Wrapper for the Twitter API"""
+    HK_PLACE_ID = "35fd5bacecc4c6e5"
 
-def criteria(status: str) -> bool:
-    """Check if status can be sent"""
-    try:
-        return status != API.user_timeline(count=1).pop().text
-    except tweepy.error.TweepError as exception:
-        exception_handler(exception)
-        return False
+    def __init__(self, api: tweepy.API) -> None:
+        self.api = api
 
-def update(aq: AirQuality) -> None:
-    """Send a tweet"""
-    status = compose(aq)
-    if criteria(status):
+    # pylint: disable=invalid-name
+    @staticmethod
+    def _compose(aq: AirQuality) -> str:
+        return "AQI: {}. The dominant pollutant is {}. (This is {}.)" \
+            .format(aq.aqi, aq.dominant_pollutant(), aq.category)
+
+    def _criteria(self, status: str) -> bool:
         try:
-            print("[{}]: {}".format(aq.localtime, status))
-            #API.update_status(status=status, place_id="35fd5bacecc4c6e5")
+            return status != self.api.user_timeline(count=1).pop().text
         except tweepy.error.TweepError as exception:
-            print("Failed to update, handling exception")
-            exception_handler(exception)
-    else:
-        print("Status \"{}\" is a duplicate".format(status))
+            print("Criteria failed with API error")
+            raise exception
 
-def exception_handler(exception: Exception) -> None:
-    """API is super fragile, so just handle it here"""
-    print(exception)
-    t_sleep = 15 * 60
-    print("Sleeping for {} seconds".format(t_sleep))
-    time.sleep(t_sleep)
-    print("Waking up")
+    def update(self, aq: AirQuality) -> bool:
+        """Send a tweet"""
+        status = self._compose(aq)
+        if self._criteria(status):
+            try:
+                print("[{}]: {}".format(aq.localtime, status))
+                self.api.update_status(status=status, place_id=self.HK_PLACE_ID)
+                return True
+            except tweepy.error.TweepError as exception:
+                print("Failed to update with API error")
+                raise exception
+        print("Status \"{}\" is a duplicate".format(status))
+        return False
 
 def main() -> None:
     """Entry point"""
-    previous_aq = None
-    sleep_time = 240
+    auth = tweepy.OAuthHandler(os.environ["API_KEY"], os.environ["API_SECRET"])
+    auth.set_access_token(os.environ["ACCESS_TOKEN"],
+                          os.environ["ACCESS_TOKEN_SECRET"])
+    api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 
-    while True:
-        try:
-            aq = AirQuality()
-            if previous_aq is None:
-                update(aq)
-                previous_aq = aq
-                time.sleep(sleep_time)
-            elif aq.time > previous_aq.time:
-                print("Current status is newer; updating...")
-                update(aq)
-                previous_aq = aq
-                time.sleep(sleep_time)
-            else:
-                print("Update failed even though we got a new status.")
-                print("Previous status: [{}] {}".format(previous_aq.time,
-                                                        compose(previous_aq)))
-                print("New status: [{}] {}".format(aq.time, compose(aq)))
-                print("Sleeping for {} seconds...".format(sleep_time * 10))
-                time.sleep(sleep_time * 10)
-        except json.JSONDecodeError as exception:
-            exception_handler(exception)
+    # pylint: disable=invalid-name
+    aq = AirQuality()
+    twitter = Twitter(api)
+    twitter.update(aq)
 
 if __name__ == "__main__":
     main()

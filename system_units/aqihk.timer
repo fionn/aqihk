@@ -1,0 +1,10 @@
+# /etc/systemd/system/aqihk.timer
+
+[Unit]
+Description=Hong Kong air quality Twitter bot timer
+
+[Timer]
+OnCalendar=hourly
+
+[Install]
+WantedBy=timers.target

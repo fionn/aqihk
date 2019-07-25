@@ -1,0 +1,34 @@
+# symlink to /etc/systemd/system/aqihk.service
+[Unit]
+Description=Hong Kong air quality Twitter bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fionn/bots/aqihk/
+EnvironmentFile=/home/fionn/bots/aqihk/.env
+ExecStart=/home/fionn/bots/aqihk/venv/bin/python3 -u src/aqihk.py
+Restart=on-failure
+RestartSec=900
+
+DynamicUser=true
+PrivateDevices=true
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+SystemCallArchitectures=native
+LockPersonality=true
+MemoryDenyWriteExecute=true
+InaccessiblePaths=/dev /boot
+RestrictRealtime=true
+PrivateMounts=true
+MountFlags=private
+PrivateUsers=true
+UMask=0777
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
