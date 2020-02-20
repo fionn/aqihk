@@ -23,9 +23,9 @@ class AirQuality:
         pollutant_map = {"pm25": "PM2.5",
                          "pm10": "PM10",
                          "co": "CO",
-                         "no2": "NO2",
-                         "o3": "O3",
-                         "so2": "SO2"}
+                         "no2": "NO₂",
+                         "o3": "O₃",
+                         "so2": "SO₂"}
 
         density = 0
         dominant_pollutant = None
